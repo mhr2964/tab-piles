@@ -1,4 +1,7 @@
 import { db } from '../db/db'
+import { isPro } from './tierGate'
+import { validateLicense } from '../license/validate'
+import { captureSnapshot, hasSnapshotPermission } from './snapshots'
 
 export interface CaptureResult {
   pileId: number
@@ -32,15 +35,27 @@ export async function saveCurrentWindowAsPile(name?: string): Promise<CaptureRes
     archivedAt: 0,
   })
 
-  const savedTabs = tabs
-    .filter((t): t is chrome.tabs.Tab & { url: string } => isCapturableUrl(t.url))
-    .map((t) => ({
-      pileId,
-      url: t.url,
-      title: t.title ?? t.url,
-      favIconUrl: t.favIconUrl,
-      addedAt: now,
-    }))
+  const capturableTabs = tabs.filter(
+    (t): t is chrome.tabs.Tab & { url: string; id: number } =>
+      isCapturableUrl(t.url) && typeof t.id === 'number',
+  )
+
+  // Snapshot capture is best-effort. If the user is Pro AND has granted the
+  // optional snapshot permission, fan out captureSnapshot per tab in parallel.
+  const license = await validateLicense().catch(() => null)
+  const wantsSnapshots = license && isPro(license) && (await hasSnapshotPermission())
+  const snapshots = wantsSnapshots
+    ? await Promise.all(capturableTabs.map((t) => captureSnapshot(t.id)))
+    : capturableTabs.map(() => undefined)
+
+  const savedTabs = capturableTabs.map((t, i) => ({
+    pileId,
+    url: t.url,
+    title: t.title ?? t.url,
+    favIconUrl: t.favIconUrl,
+    addedAt: now,
+    snapshot: snapshots[i],
+  }))
 
   if (savedTabs.length > 0) await db.tabs.bulkAdd(savedTabs)
 

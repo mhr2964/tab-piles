@@ -4,6 +4,9 @@ import { db, ACTIVE_PILE_CAP } from '../db/db'
 import { PileList } from './PileList'
 import { PileDetail } from './PileDetail'
 import { CommandPalette } from './CommandPalette'
+import { Settings } from './Settings'
+import { useLicense } from '../license/useLicense'
+import { useSync } from '../sync/useSync'
 
 type View = 'active' | 'archived'
 
@@ -12,6 +15,9 @@ export function SidePanelApp() {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<View>('active')
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const license = useLicense()
+  useSync(license)
 
   const activePiles = useLiveQuery(
     () => db.piles.where('archivedAt').equals(0).reverse().sortBy('updatedAt'),
@@ -63,8 +69,19 @@ export function SidePanelApp() {
     <div className="app">
       <header className="app-header">
         <h1>Tab Piles</h1>
-        <div className="cap-meter" data-over={overCap}>
-          {activeCount} / {ACTIVE_PILE_CAP}
+        <div className="app-header-right">
+          <div className="cap-meter" data-over={overCap}>
+            {activeCount} / {ACTIVE_PILE_CAP}
+          </div>
+          <button
+            type="button"
+            className="settings-trigger"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Settings"
+            title="Settings"
+          >
+            ⚙
+          </button>
         </div>
       </header>
 
@@ -121,6 +138,10 @@ export function SidePanelApp() {
             setPaletteOpen(false)
           }}
         />
+      )}
+
+      {settingsOpen && (
+        <Settings license={license} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   )

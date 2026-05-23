@@ -1,9 +1,12 @@
 import { saveCurrentWindowAsPile } from '../lib/capture'
 import { archiveStalePiles } from '../db/db'
+import { validateLicense } from '../license/validate'
+import { runSync } from '../sync/sync'
 
 const AUTO_ARCHIVE_ALARM = 'tab-piles:auto-archive'
+const SYNC_ALARM = 'tab-piles:sync'
 
-function ensureAutoArchiveAlarm() {
+function ensureAlarms() {
   chrome.alarms.get(AUTO_ARCHIVE_ALARM, (existing) => {
     if (!existing) {
       chrome.alarms.create(AUTO_ARCHIVE_ALARM, {
@@ -12,24 +15,51 @@ function ensureAutoArchiveAlarm() {
       })
     }
   })
+  chrome.alarms.get(SYNC_ALARM, (existing) => {
+    if (!existing) {
+      chrome.alarms.create(SYNC_ALARM, {
+        delayInMinutes: 5,
+        periodInMinutes: 60,
+      })
+    }
+  })
 }
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {})
-  ensureAutoArchiveAlarm()
+  ensureAlarms()
 })
 
 chrome.runtime.onStartup.addListener(() => {
-  ensureAutoArchiveAlarm()
+  ensureAlarms()
 })
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== AUTO_ARCHIVE_ALARM) return
-  try {
-    const n = await archiveStalePiles()
-    if (n > 0) console.info(`[tab-piles] auto-archived ${n} stale pile(s)`)
-  } catch (err) {
-    console.error('[tab-piles] auto-archive failed', err)
+  if (alarm.name === AUTO_ARCHIVE_ALARM) {
+    try {
+      const n = await archiveStalePiles()
+      if (n > 0) console.info(`[tab-piles] auto-archived ${n} stale pile(s)`)
+    } catch (err) {
+      console.error('[tab-piles] auto-archive failed', err)
+    }
+    return
+  }
+
+  if (alarm.name === SYNC_ALARM) {
+    try {
+      const license = await validateLicense()
+      const result = await runSync(license)
+      if (result.ok && (result.pushed || result.pulled || result.tombstoned)) {
+        console.info(
+          `[tab-piles] sync ok — pushed ${result.pushed}, pulled ${result.pulled}, tombstoned ${result.tombstoned}`,
+        )
+      } else if (!result.ok && result.error !== 'pro license required' && result.error !== 'sync already in progress') {
+        console.warn('[tab-piles] sync failed', result.error)
+      }
+    } catch (err) {
+      console.error('[tab-piles] sync alarm error', err)
+    }
+    return
   }
 })
 

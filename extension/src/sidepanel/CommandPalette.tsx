@@ -11,6 +11,7 @@ interface Props {
 type Result =
   | { kind: 'pile'; pile: Pile }
   | { kind: 'tab'; tab: SavedTab; pileName: string }
+  | { kind: 'snapshot'; tab: SavedTab; pileName: string; excerpt: string }
 
 const MAX_RESULTS = 50
 
@@ -40,10 +41,25 @@ export function CommandPalette({ onClose, onOpenPile }: Props) {
       }
     }
 
+    const snapshotResults: Result[] = []
     for (const t of tabs ?? []) {
-      if (!q || t.title.toLowerCase().includes(q) || t.url.toLowerCase().includes(q)) {
+      const titleHit = !q || t.title.toLowerCase().includes(q) || t.url.toLowerCase().includes(q)
+      const noteHit = !!q && !!t.note && t.note.toLowerCase().includes(q)
+      if (titleHit || noteHit) {
         const pile = pileById[t.pileId]
         tabResults.push({ kind: 'tab', tab: t, pileName: pile?.name ?? '?' })
+        continue
+      }
+      // Snapshot hits only fire when there's a query AND no title/note match
+      if (q && t.snapshot) {
+        const idx = t.snapshot.toLowerCase().indexOf(q)
+        if (idx >= 0) {
+          const start = Math.max(0, idx - 30)
+          const end = Math.min(t.snapshot.length, idx + q.length + 60)
+          const excerpt = (start > 0 ? '…' : '') + t.snapshot.slice(start, end).replace(/\s+/g, ' ') + (end < t.snapshot.length ? '…' : '')
+          const pile = pileById[t.pileId]
+          snapshotResults.push({ kind: 'snapshot', tab: t, pileName: pile?.name ?? '?', excerpt })
+        }
       }
     }
 
@@ -55,8 +71,12 @@ export function CommandPalette({ onClose, onOpenPile }: Props) {
       if (a.kind !== 'tab' || b.kind !== 'tab') return 0
       return b.tab.addedAt - a.tab.addedAt
     })
+    snapshotResults.sort((a, b) => {
+      if (a.kind !== 'snapshot' || b.kind !== 'snapshot') return 0
+      return b.tab.addedAt - a.tab.addedAt
+    })
 
-    return [...pileResults, ...tabResults].slice(0, MAX_RESULTS)
+    return [...pileResults, ...tabResults, ...snapshotResults].slice(0, MAX_RESULTS)
   }, [piles, tabs, pileById, query])
 
   useEffect(() => {
@@ -79,6 +99,12 @@ export function CommandPalette({ onClose, onOpenPile }: Props) {
       void chrome.tabs.create({ url: r.tab.url })
       onClose()
     }
+  }
+
+  const keyFor = (r: Result, i: number): string => {
+    if (r.kind === 'pile') return `p-${r.pile.id}`
+    if (r.kind === 'snapshot') return `s-${r.tab.id}-${i}`
+    return `t-${r.tab.id}`
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -121,7 +147,7 @@ export function CommandPalette({ onClose, onOpenPile }: Props) {
           <ul className="palette-results" ref={listRef}>
             {results.map((r, i) => (
               <li
-                key={r.kind === 'pile' ? `p-${r.pile.id}` : `t-${r.tab.id}`}
+                key={keyFor(r, i)}
                 data-cursor={i === cursor}
                 className="palette-row"
                 onMouseEnter={() => setCursor(i)}
@@ -132,10 +158,19 @@ export function CommandPalette({ onClose, onOpenPile }: Props) {
                     <span className="palette-kind">pile</span>
                     <span className="palette-primary">{r.pile.name}</span>
                   </>
-                ) : (
+                ) : r.kind === 'tab' ? (
                   <>
                     <span className="palette-kind">tab</span>
                     <span className="palette-primary">{r.tab.title}</span>
+                    <span className="palette-secondary">{r.pileName}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="palette-kind palette-kind-snapshot">page</span>
+                    <span className="palette-primary palette-primary-snapshot">
+                      <span className="palette-snapshot-title">{r.tab.title}</span>
+                      <span className="palette-snapshot-excerpt">{r.excerpt}</span>
+                    </span>
                     <span className="palette-secondary">{r.pileName}</span>
                   </>
                 )}

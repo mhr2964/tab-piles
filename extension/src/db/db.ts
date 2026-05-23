@@ -1,6 +1,9 @@
 import Dexie, { type Table } from 'dexie'
 import type { Pile, SavedTab } from './types'
 
+// Re-export so callers don't have to dive into ./types
+export type { Pile, SavedTab }
+
 export class TabPilesDB extends Dexie {
   piles!: Table<Pile, number>
   tabs!: Table<SavedTab, number>
@@ -32,6 +35,17 @@ export async function updatePile(
   patch: Partial<Pick<Pile, 'name' | 'note' | 'tags'>>,
 ): Promise<void> {
   await db.piles.update(id, { ...patch, updatedAt: Date.now() })
+}
+
+export async function updateTab(
+  id: number,
+  patch: Partial<Pick<SavedTab, 'note' | 'title'>>,
+): Promise<void> {
+  const tab = await db.tabs.get(id)
+  if (!tab) return
+  await db.tabs.update(id, patch)
+  // Bump the parent pile's updatedAt so cloud sync notices.
+  await db.piles.update(tab.pileId, { updatedAt: Date.now() })
 }
 
 export async function unarchivePile(id: number): Promise<void> {

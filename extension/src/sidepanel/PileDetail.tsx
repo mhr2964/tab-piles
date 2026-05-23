@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, updatePile, unarchivePile } from '../db/db'
+import { db, updatePile, unarchivePile, updateTab } from '../db/db'
+import { useLicense } from '../license/useLicense'
+import { isPro } from '../lib/tierGate'
+import type { SavedTab } from '../db/types'
 
 interface Props {
   pileId: number
@@ -157,14 +160,66 @@ export function PileDetail({ pileId, onBack }: Props) {
 
       <ul className="tab-list">
         {tabs?.map((t) => (
-          <li key={t.id}>
-            <a href={t.url} target="_blank" rel="noreferrer">
-              {t.favIconUrl && <img src={t.favIconUrl} alt="" width={16} height={16} />}
-              <span>{t.title}</span>
-            </a>
-          </li>
+          <TabRow key={t.id} tab={t} />
         ))}
       </ul>
     </div>
+  )
+}
+
+function TabRow({ tab }: { tab: SavedTab }) {
+  const license = useLicense()
+  const canEdit = isPro(license)
+  const hasNote = !!(tab.note && tab.note.trim())
+  const [expanded, setExpanded] = useState(hasNote)
+  const [draft, setDraft] = useState(tab.note ?? '')
+
+  useEffect(() => {
+    setDraft(tab.note ?? '')
+    if (hasNote) setExpanded(true)
+  }, [tab.id, tab.note, hasNote])
+
+  const commit = async () => {
+    if (!canEdit) return
+    if (tab.id === undefined) return
+    if ((tab.note ?? '') === draft) return
+    await updateTab(tab.id, { note: draft })
+  }
+
+  return (
+    <li className="tab-row">
+      <div className="tab-row-main">
+        <a href={tab.url} target="_blank" rel="noreferrer">
+          {tab.favIconUrl && <img src={tab.favIconUrl} alt="" width={16} height={16} />}
+          <span>{tab.title}</span>
+        </a>
+        {(canEdit || hasNote) && (
+          <button
+            type="button"
+            className="tab-note-toggle"
+            onClick={() => setExpanded((v) => !v)}
+            aria-label={hasNote ? 'Toggle note' : 'Add note'}
+            title={hasNote ? (canEdit ? 'Edit note' : 'View note') : 'Add note (Pro)'}
+            data-has-note={hasNote}
+          >
+            {hasNote ? '✎' : '+ note'}
+          </button>
+        )}
+      </div>
+      {expanded && (canEdit || hasNote) && (
+        canEdit ? (
+          <textarea
+            className="tab-note"
+            value={draft}
+            placeholder="Why is this tab here? What were you looking for?"
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => void commit()}
+            rows={2}
+          />
+        ) : (
+          <p className="tab-note tab-note-readonly">{tab.note}</p>
+        )
+      )}
+    </li>
   )
 }

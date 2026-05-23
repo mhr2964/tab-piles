@@ -15,5 +15,7 @@ export interface SavedTab {
   title: string
   favIconUrl?: string
   note?: string
+  /** Plain-text snapshot of the page at save time. Pro feature; truncated to 50 KB. */
+  snapshot?: string
   addedAt: number
 }
