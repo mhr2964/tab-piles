@@ -6,9 +6,19 @@ export default defineManifest({
   name: 'Tab Piles',
   description: pkg.description,
   version: pkg.version,
+  icons: {
+    16: 'icons/icon-16.png',
+    32: 'icons/icon-32.png',
+    48: 'icons/icon-48.png',
+    128: 'icons/icon-128.png',
+  },
   action: {
     default_title: 'Save this window to a pile',
     default_popup: 'src/popup/popup.html',
+    default_icon: {
+      16: 'icons/icon-16.png',
+      32: 'icons/icon-32.png',
+    },
   },
   background: {
     service_worker: 'src/background/index.ts',
@@ -18,6 +28,11 @@ export default defineManifest({
     default_path: 'src/sidepanel/sidepanel.html',
   },
   permissions: ['tabs', 'storage', 'sidePanel', 'unlimitedStorage', 'alarms'],
+  // Snapshot search is a Pro feature. Request 'scripting' + host access lazily,
+  // so the free-tier install does not need to surface the scary "read your data
+  // on all websites" prompt.
+  optional_permissions: ['scripting'],
+  optional_host_permissions: ['<all_urls>'],
   commands: {
     'save-current-window': {
       suggested_key: { default: 'Ctrl+Shift+S', mac: 'Command+Shift+S' },
