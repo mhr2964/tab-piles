@@ -10,73 +10,83 @@ state: green
 
 ## Next action
 
-Phase 1 (in-browser feature work) is complete and live-smoked. Remaining v1 work is presentation + distribution:
+All in-extension feature work for v1 (free) and v1-Pro is complete and committed. Remaining work is **deploy + distribution**, gated on user-supplied accounts:
 
-1. **Icons.** Manifest declares no `icons` block; Chrome shows default puzzle-piece. Generate 16/32/48/128 PNGs and wire into `manifest.config.ts` before any CWS submission. Brand has a name ("Tab Piles") + tagline ("Drop a research thread, pick it up next Tuesday") but no visual identity yet.
-2. **Chrome Web Store listing prep.** Short description (132 char), detailed description, category, screenshots (1280×800 or 640×400, 1–5), privacy notice + per-permission justification (`tabs`, `storage`, `sidePanel`, `unlimitedStorage`, `alarms`). First review takes 5–7 days — submit early.
-3. **Landing + billing (Phase 3).** Recommended: Cloudflare Pages for the landing page, LemonSqueezy/Paddle for billing (Merchant-of-Record beats Stripe at this price point — no EU VAT to handle). License key entry in the side-panel settings, validated against a CF Workers endpoint, cached for 24h. No login required for the free tier.
-4. **Pro tier (Phase 4, deferred).** Cloud sync (CF Workers + D1), per-tab notes, full-text page-snapshot search. Do not build until at least a few people have paid for the lifetime tier.
+1. **Chrome Web Store dev account** ($5 one-time). Then: zip `extension/dist/`, paste copy from `listing/copy.md`, paste justifications from `listing/permissions.md`, upload the 5 screenshots from `listing/screenshots/`. Submit. 5-7 day review SLA.
+2. **Cloudflare account** + custom domain. Connect `Projects/tab-piles-landing/` to CF Pages (output dir `src/`, no build command). Connect `Projects/tab-piles-worker/` via `wrangler deploy`. Create the D1 database first: `cd Projects/tab-piles-worker && npx wrangler d1 create tab-piles` and paste the returned database_id into `wrangler.toml`.
+3. **Lemon Squeezy account** with three products (monthly $5, yearly $40, lifetime $79). Set `activation_limit: 5` on each. Paste variant IDs into `Projects/tab-piles-worker/wrangler.toml` and Lemon Squeezy checkout URLs into `Projects/tab-piles-landing/src/main.js`. `npx wrangler secret put LS_API_KEY` and paste the LS API key.
+4. **Set `WORKER_URL`** in `extension/src/license/validate.ts` to the deployed worker URL, then rebuild + re-submit the extension (or save it for the v0.0.2 update).
 
-## Recent context — 2026-05-23 Phase 1a + 1b shipped
+Each of these has its own per-repo HANDOFF.md with detailed steps. See `Projects/tab-piles-landing/HANDOFF.md` and `Projects/tab-piles-worker/HANDOFF.md`.
 
-All seven features landed and live-smoked in one session, zero console errors at end of run:
+## Recent context — 2026-05-23 Phase 2-5 shipped
 
-**Phase 1a (UX gaps a real beta user would have hit):**
-- **Archived view.** `view: 'active' | 'archived'` toggle in side-panel header. Both counts (`Active (N)` / `Archived (M)`) wired to live queries.
-- **Tag editor in PileDetail.** Chip list with × to remove, input with Enter/comma to add, Backspace on empty input removes the last tag. Persists via `updatePile(id, { tags })` which bumps `updatedAt`.
-- **Click-to-rename pile heading.** Click name → input (auto-focused + selected). Enter or blur saves, Esc cancels. Empty/unchanged names are ignored.
-- **Unarchive button.** When `pile.archivedAt > 0`, the Archive button is replaced by "Restore to active" — `unarchivePile(id)` zeroes `archivedAt` and bumps `updatedAt`.
+Five phases landed in one session, three new repos created, all builds + typechecks clean.
 
-**Phase 1b (v1 feature scope from prior sessions):**
-- **Cmd+K command palette.** Modal overlay over `SidePanelApp`. Listens for Cmd+K / Ctrl+K at the window level. Mixed pile + tab results (each tab shows its parent pile name). ↑↓ wrapping navigation, Enter selects, Esc closes, click-on-row selects. Selecting a pile opens it; selecting a tab opens it in a new browser tab.
-- **Auto-archive at 30 days.** `chrome.alarms` daily alarm (`tab-piles:auto-archive`, `periodInMinutes: 1440`), created in both `onInstalled` and `onStartup`. Handler calls `archiveStalePiles()` which queries `db.piles.where('archivedAt').equals(0).and(p => p.updatedAt < now - 30d)` and stamps `archivedAt = now`. End-to-end verified in smoke by backdating a pile + forcing the alarm.
+**Phase 2 — brand mark + icons.** Three offset cards with a folded amber corner, charcoal + #F59E0B palette. `extension/public/icons/icon.svg` is the master; `extension/scripts/rasterize-icons.mjs` uses `sharp` to emit 16/32/48/128 PNGs. Wired into the manifest `icons` + `action.default_icon` blocks. Verified live in chrome://extensions card.
 
-**Schema/helpers:**
-- `updatePile(id, patch)`, `unarchivePile(id)`, `archiveStalePiles(now?)`, and constant `AUTO_ARCHIVE_AFTER_MS` all live in `extension/src/db/db.ts`.
-- `alarms` permission added to manifest.
+**Phase 3 — CWS listing.** Copy + permission justifications + 5 screenshots at 1280x800, all under `listing/`. Screenshots captured via Playwright MCP from a seeded demo profile (4 active piles with realistic names + tags), framed as centered cards on a soft gradient via injected CSS, post-processed via `extension/scripts/normalize-screenshots.mjs`.
 
-**Manifest shortcuts — partial:**
-- `Ctrl+Shift+S` (save current window) — registered, working.
-- `Ctrl+Shift+L` (`_execute_action`) — registered, working.
-- `Alt+Shift+P` (open side panel) — initially had `Ctrl+Shift+P` which Chrome reserves for its devtools command bar; switched to `Alt+Shift+P` in manifest. Chrome **does not auto-apply a new `suggested_key` on extension reload** (only on first install or version bump), so existing installs will show "Not set" — users bind it manually at `chrome://extensions/shortcuts`. Documented as expected behavior.
+**Phase 4a — landing page.** New repo at `Projects/tab-piles-landing/`. One-page HTML+CSS+vanilla-JS site, no build step. Sections: hero, 3-feature grid, 4-tier pricing, privacy strip, footer + legal stubs. Brand palette matches the extension exactly. Lemon Squeezy overlay buttons wired with placeholder URLs.
+
+**Phase 4b — billing Worker.** New repo at `Projects/tab-piles-worker/`. Cloudflare Workers + D1 + Hono. Endpoints `/health`, `/activate`, `/validate`, `/deactivate`, `/sync`. 24h D1 cache over Lemon Squeezy. Migration `0001_init.sql` creates `validations`, `piles_cloud`, `tombstones`. Typechecks clean.
+
+**Phase 4c — license activation in extension.** Gear icon in side-panel header opens a Settings modal where users paste a key + see their tier. `src/license/validate.ts` talks to the Worker, caches in `chrome.storage.local` with 24h freshness, 14-day offline grace. `useLicense` hook + `isPro()` tier-gate chokepoint.
+
+**Phase 5a — cloud sync.** `src/sync/sync.ts` runs bidirectional LWW sync. Triggers: initial-mount, debounced 5s after `db.piles` writes (via Dexie hooks), and hourly via a service-worker alarm. Lock prevents concurrent runs.
+
+**Phase 5b — per-tab notes.** `SavedTab.note` was already in the schema (pre-existing). Added inline textarea per tab row, Pro-gated for editing. Notes participate in Cmd+K search.
+
+**Phase 5c — snapshot full-text search.** `scripting` permission + `<all_urls>` declared as **optional** so free-tier install stays clean. Pro user toggles capture on in Settings → grants permission → subsequent saves capture `document.body.innerText` (capped at 50 KB) into `SavedTab.snapshot`. Cmd+K palette gets a `page` result kind that surfaces ±30 chars of context around matches.
 
 ## Verify the extension loaded (first step every session)
 
-1. `mcp__playwright-tabpiles__browser_navigate` → `chrome://extensions`. Expect "Tab Piles" card.
-2. Read extension ID from the card. 2026-05-23 ID was `nbddndiaihohcpamcanhohfjkbjhgmkh` — same `--user-data-dir` should yield the same ID across sessions, but verify.
-3. **After clicking in-page "Reload" on the Tab Piles card, Chrome may auto-disable the extension and surface "Turn on developer mode" — even though dev mode appeared on a moment earlier.** Click the Developer mode toggle in the header to flip it back on; the extension re-enables and the new bundle loads. This happened cleanly on 2026-05-23 with no IndexedDB loss.
+1. `mcp__playwright-tabpiles__browser_navigate` → `chrome://extensions`. Expect "Tab Piles" card with the amber stacked-cards mark.
+2. Read extension ID from the card. Same `--user-data-dir` gives the same ID across sessions; 2026-05-23 ID was `nbddndiaihohcpamcanhohfjkbjhgmkh`.
+3. After clicking "Reload" on the card, Chrome may auto-disable the extension and surface "Turn on developer mode." Flip the toggle back on; the extension re-enables and the new bundle loads.
 
-## Smoke checklist (current — verified passing 2026-05-23)
+## Smoke checklist (current — works through Phase 1)
+
+The Pro paths (Phase 4c-5c) cannot be smoked end-to-end without a deployed Worker. The free-tier paths still pass:
 
 1. Open two arbitrary URLs.
-2. Open `chrome-extension://<id>/src/popup/popup.html` in a tab (toolbar popup itself isn't programmatically openable without a user gesture). Save → confirm tab closes after ~800ms.
-3. Open `chrome-extension://<id>/src/sidepanel/sidepanel.html`. Confirm the new pile appears in Active and the cap meter increments.
-4. **Toggle Archived view** — empty state if nothing archived; otherwise the archived pile list. Toggle back to Active.
-5. Open the pile. **Click the name** → edit → Enter. Confirm rename persists.
-6. **Add a tag** via the tag input → Enter. Confirm chip appears. Click × on the chip → confirm removal.
-7. Archive the pile → confirm it moves to Archived. Open it from Archived. Click "Restore to active" → confirm it moves back.
-8. Press **Cmd+K (or Ctrl+K)** → palette opens. Type a tab name → results narrow. Press ↑↓ to navigate. Press Esc → closes.
-9. (Optional) Force auto-archive: in DevTools on the side panel, backdate a pile's `updatedAt` to 31 days ago via IndexedDB, then `chrome.alarms.create('tab-piles:auto-archive', { delayInMinutes: 1/60, periodInMinutes: 1440 })`. Wait ~35s. Confirm pile auto-archives. (Chrome enforces a 30s minimum alarm delay for packed extensions.)
+2. Open `chrome-extension://<id>/src/popup/popup.html`. Save → confirm tab closes after ~800ms.
+3. Open `chrome-extension://<id>/src/sidepanel/sidepanel.html`. Confirm the pile appears in Active.
+4. Toggle Archived view — empty state if nothing archived. Toggle back.
+5. Open the pile. Click the name → edit → Enter. Confirm rename persists.
+6. Add a tag → Enter. Confirm chip appears. Click ×.
+7. Archive → confirm moves to Archived. Open from Archived. Click "Restore to active."
+8. Press Cmd+K → palette opens. Type a tab name → results narrow. ↑↓, Esc.
+9. **Gear icon (NEW)** opens Settings. Without a Worker, Activate will fail with a network error — that's the expected user-block state.
+10. (Optional) Force auto-archive via DevTools as before.
 
-If any step fails, check `chrome://extensions` → Tab Piles → "Inspect views: service worker" for errors. After a rebuild (`npm run build`), reload the extension card so the new bundle loads.
+When the Worker is deployed:
+- Paste a real LS license key → tier pill flips to "Pro · Monthly" within 2s.
+- Hover a tab row → "+ note" appears. Click → textarea → type → blur. Reload, note persists.
+- Cmd+K search a word that's in a note → tab surfaces under the 'tab' kind with the note matched.
+- In Settings, "Enable snapshot capture" → Chrome prompts for host permissions → grant. Save a new pile from a real webpage. Cmd+K search a word from that page → 'page' result kind surfaces with the matched excerpt.
 
 ## Traps
 
-- **`@playwright/mcp`'s `--extension` flag is a boolean, not a path.** It means "connect to a running browser via the official Playwright Extension companion app." Path-to-extension goes through `--config` → `browser.launchOptions.args: ["--load-extension=<dist>"]`.
-- **Native OS folder picker can't be automated.** That's why we auto-load via `--load-extension`.
-- **MV3 service worker terminates when idle.** `chrome.commands.onCommand` and `chrome.alarms.onAlarm` listeners at top level of `src/background/index.ts` wake it. Don't move them inside async init blocks.
-- **Dexie `null` is not indexable.** Schema uses `archivedAt: 0` for active and `archivedAt: <timestamp>` for archived.
-- **Free tier soft cap is load-bearing.** `ACTIVE_PILE_CAP = 10` in `src/db/db.ts`. Cap meter and popup warn use it.
-- **`chrome.action.openPopup` requires a real user gesture** — Playwright can't drive it. Open `popup.html` as a tab to exercise the same React tree + message contract.
-- **`window.close()` in the popup is a no-op when popup is loaded as a tab.** It closes the tab instead — fine for smoke, expected for real popup use.
-- **`suggested_key` updates only apply on first install / version bump.** Changing a shortcut in `manifest.config.ts` won't re-bind on existing installs; users must rebind manually.
-- **`chrome.alarms` minimum delay is 30s for packed extensions** (warning in unpacked, hard floor in packed). Don't write tests that expect sub-30s firing.
-- **Chrome Web Store first review can take 5–7 days.** Submit early.
+- **`@playwright/mcp`'s `--extension` flag is boolean.** Path goes through `--config → browser.launchOptions.args: ["--load-extension=<dist>"]`.
+- **MV3 service worker terminates when idle.** `chrome.commands.onCommand`, `chrome.alarms.onAlarm`, and `chrome.runtime.onMessage` listeners live at top level of `src/background/index.ts` so the SW wakes for them.
+- **Dexie `null` is not indexable.** Schema uses `archivedAt: 0` for active, `archivedAt: <timestamp>` for archived.
+- **Free tier soft cap (`ACTIVE_PILE_CAP = 10`) is load-bearing.** Cap meter + popup warn use it. Pro tier does NOT remove the cap in code — the upgrade decision is to add `if (isPro(license)) skip cap` if the Pro plan promises "no cap." Currently the cap meter shows for everyone.
+- **`chrome.action.openPopup` requires a real user gesture.** Playwright can't drive it. Open `popup.html` as a tab to exercise the same React tree.
+- **`window.close()` in the popup is a no-op when popup is loaded as a tab.** It closes the test tab — fine for smoke.
+- **`suggested_key` updates only apply on first install / version bump.** Changing a shortcut in `manifest.config.ts` won't re-bind on existing installs.
+- **`chrome.alarms` minimum delay is 30s for packed extensions.** Don't write tests that expect sub-30s firing.
+- **Optional permissions don't survive reload of unpacked extension on some Chrome versions.** When testing snapshot capture, you may need to re-grant after each `npm run build` + reload.
+- **`WORKER_URL` is a placeholder.** Until set, all `/validate`, `/activate`, `/deactivate`, `/sync` calls will fail. Free tier paths are unaffected.
+- **License cache key is `tab-piles:license` in `chrome.storage.local`.** Sync cursor is `tab-piles:sync-cursor`. Don't reuse those keys.
+- **Sync uses LWW on client clock.** Document trap: clocks skewed >5 minutes between user devices can lose writes silently. Acceptable for v1 Pro.
+- **Chrome Web Store first review can take 5-7 days.** Submit early.
 
 ## Do not touch
 
 - `extension/dist/` — generated by `npm run build`. Never hand-edit.
+- `extension/public/icons/icon-*.png` — generated by `extension/scripts/rasterize-icons.mjs`. Edit `icon.svg` and regenerate.
 
 ---
 
-When the work-stream is done, **delete this file** (don't leave a stale "complete" handoff lying around). The git history holds the record.
+When the work-stream is done (extension live in CWS, Worker deployed, landing live, first paid customer), **delete this file**.
