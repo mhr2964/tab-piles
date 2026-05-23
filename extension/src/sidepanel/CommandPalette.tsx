@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import type { Pile, SavedTab } from '../db/types'
+import { useLicense } from '../license/useLicense'
+import { isPro, UPGRADE_URL } from '../lib/tierGate'
 
 interface Props {
   onClose: () => void
@@ -20,6 +22,8 @@ export function CommandPalette({ onClose, onOpenPile }: Props) {
   const [cursor, setCursor] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const license = useLicense()
+  const pro = isPro(license)
 
   const piles = useLiveQuery(() => db.piles.toArray(), [])
   const tabs = useLiveQuery(() => db.tabs.toArray(), [])
@@ -142,7 +146,14 @@ export function CommandPalette({ onClose, onOpenPile }: Props) {
           onKeyDown={onKeyDown}
         />
         {results.length === 0 ? (
-          <div className="palette-empty">No matches.</div>
+          <div className="palette-empty">
+            <div>No matches.</div>
+            {!pro && query.trim() && (
+              <a className="palette-upgrade" href={UPGRADE_URL} target="_blank" rel="noreferrer">
+                Page-snapshot search is Pro — go Pro to search inside saved pages →
+              </a>
+            )}
+          </div>
         ) : (
           <ul className="palette-results" ref={listRef}>
             {results.map((r, i) => (

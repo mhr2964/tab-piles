@@ -5,24 +5,42 @@
 
 const SNAPSHOT_MAX_BYTES = 50 * 1024 // 50 KB per tab
 
+const SNAPSHOT_PERMS = ['scripting'] as const
+const SNAPSHOT_ORIGINS = ['<all_urls>'] as const
+
 export async function hasSnapshotPermission(): Promise<boolean> {
   return chrome.permissions.contains({
-    permissions: ['scripting'],
-    origins: ['<all_urls>'],
+    permissions: [...SNAPSHOT_PERMS],
+    origins: [...SNAPSHOT_ORIGINS],
   })
 }
 
-export async function requestSnapshotPermission(): Promise<boolean> {
-  return chrome.permissions.request({
-    permissions: ['scripting'],
-    origins: ['<all_urls>'],
+/**
+ * Returns 'granted' only when BOTH the API permission and the host access are
+ * granted. Chrome allows users to grant one and deny the other from the
+ * permission dialog; without explicit verification a half-grant looks
+ * indistinguishable from a full grant but silently breaks captureSnapshot.
+ */
+export async function requestSnapshotPermission(): Promise<'granted' | 'partial' | 'denied'> {
+  const requested = await chrome.permissions.request({
+    permissions: [...SNAPSHOT_PERMS],
+    origins: [...SNAPSHOT_ORIGINS],
   })
+  if (!requested) return 'denied'
+
+  // Belt + suspenders: even when request resolves true, re-query both halves.
+  const [hasPerm, hasHost] = await Promise.all([
+    chrome.permissions.contains({ permissions: [...SNAPSHOT_PERMS] }),
+    chrome.permissions.contains({ origins: [...SNAPSHOT_ORIGINS] }),
+  ])
+  if (hasPerm && hasHost) return 'granted'
+  return 'partial'
 }
 
 export async function removeSnapshotPermission(): Promise<void> {
   await chrome.permissions.remove({
-    permissions: ['scripting'],
-    origins: ['<all_urls>'],
+    permissions: [...SNAPSHOT_PERMS],
+    origins: [...SNAPSHOT_ORIGINS],
   })
 }
 
@@ -38,8 +56,11 @@ export async function captureSnapshot(tabId: number): Promise<string | undefined
       return text.slice(0, SNAPSHOT_MAX_BYTES)
     }
     return text
-  } catch {
-    // Tab might be a chrome:// page or otherwise unscriptable. Silently skip.
+  } catch (err) {
+    // Tab might be a chrome:// page or otherwise unscriptable, or the user
+    // denied <all_urls> while granting 'scripting'. Log the tabId for support
+    // triage — NEVER log the page content / err response (PII leak).
+    console.debug(`[tab-piles] snapshot skipped for tab ${tabId}`)
     return undefined
   }
 }

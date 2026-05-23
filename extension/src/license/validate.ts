@@ -1,13 +1,31 @@
 import { ANON_LICENSE, type LicenseState, type Tier } from './types'
+import { STORAGE_LICENSE } from '../lib/storageKeys'
 
 // USER: set after worker deploy. Until then license activation will fail with
 // a network error and the extension stays on the free tier. That's the safe
 // default — no Pro features are gated yet anyway.
 export const WORKER_URL = 'https://tab-piles-worker.example.workers.dev'
 
-const STORAGE_KEY = 'tab-piles:license'
-const REVALIDATE_AFTER_MS = 24 * 60 * 60 * 1000
+// Mount-side mirror of the worker's cache window. The worker is the source of
+// truth; this constant just tells `useLicense` when to bother re-asking the
+// worker (avoids hammering on every side-panel re-mount).
+export const REVALIDATE_AFTER_MS = 24 * 60 * 60 * 1000
+
+// If the worker is unreachable AND the last successful validation was within
+// this window, treat the cached state as still authoritative — don't drop
+// paying users to Free because their network blinked.
 const OFFLINE_GRACE_MS = 14 * 24 * 60 * 60 * 1000
+
+// DEV ESCAPE HATCH for local Pro-feature smoke without standing up the worker.
+// Paste into DevTools console on the side-panel page:
+//
+//   chrome.storage.local.set({ 'tab-piles:license': {
+//     licenseKey: 'DEV', instanceId: 'DEV', tier: 'lifetime',
+//     valid: true, cachedAt: Date.now(), expiresAt: null,
+//   }})
+//
+// The extension treats this as Pro · Lifetime. Cloud sync will fail against the
+// placeholder WORKER_URL — that's expected; UI shells are exercisable anyway.
 
 interface ActivateResponse {
   valid: boolean
@@ -19,12 +37,12 @@ interface ActivateResponse {
 }
 
 async function readStored(): Promise<LicenseState> {
-  const out = await chrome.storage.local.get(STORAGE_KEY)
-  return (out[STORAGE_KEY] as LicenseState | undefined) ?? ANON_LICENSE
+  const out = await chrome.storage.local.get(STORAGE_LICENSE)
+  return (out[STORAGE_LICENSE] as LicenseState | undefined) ?? ANON_LICENSE
 }
 
 async function writeStored(state: LicenseState): Promise<void> {
-  await chrome.storage.local.set({ [STORAGE_KEY]: state })
+  await chrome.storage.local.set({ [STORAGE_LICENSE]: state })
 }
 
 async function postWorker(path: '/activate' | '/validate' | '/deactivate', body: object): Promise<ActivateResponse> {
@@ -68,10 +86,9 @@ export async function validateLicense(now: number = Date.now()): Promise<License
   const stored = await readStored()
   if (!stored.licenseKey || !stored.instanceId) return ANON_LICENSE
 
-  if (stored.cachedAt && now - stored.cachedAt < REVALIDATE_AFTER_MS) {
-    return stored
-  }
-
+  // No client-side cache short-circuit. The worker holds the authoritative 24h
+  // cache; stacking another 24h here would mean a refunded / chargebacked /
+  // disabled license keeps Pro access for up to 48h. Always ask the worker.
   try {
     const res = await postWorker('/validate', {
       licenseKey: stored.licenseKey,
@@ -106,7 +123,9 @@ export async function deactivateLicense(): Promise<LicenseState> {
       instanceId: stored.instanceId,
     })
   } catch (err) {
-    console.warn('[tab-piles] worker deactivate failed; clearing locally anyway', err)
+    // Slice the error string defensively — LS error messages occasionally echo
+    // request params, and we don't want full keys winding up in extension logs.
+    console.warn('[tab-piles] worker deactivate failed; clearing locally anyway:', String(err).slice(0, 200))
   }
   await writeStored(ANON_LICENSE)
   return ANON_LICENSE
@@ -119,8 +138,8 @@ export async function getLocalLicense(): Promise<LicenseState> {
 export function watchLicense(cb: (state: LicenseState) => void): () => void {
   const handler = (changes: { [k: string]: chrome.storage.StorageChange }, area: string) => {
     if (area !== 'local') return
-    if (!(STORAGE_KEY in changes)) return
-    cb((changes[STORAGE_KEY]?.newValue as LicenseState | undefined) ?? ANON_LICENSE)
+    if (!(STORAGE_LICENSE in changes)) return
+    cb((changes[STORAGE_LICENSE]?.newValue as LicenseState | undefined) ?? ANON_LICENSE)
   }
   chrome.storage.onChanged.addListener(handler)
   return () => chrome.storage.onChanged.removeListener(handler)

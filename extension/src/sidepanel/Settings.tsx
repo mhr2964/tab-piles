@@ -38,9 +38,19 @@ export function Settings({ license, onClose }: Props) {
         await removeSnapshotPermission()
         setSnapshotsOn(false)
       } else {
-        const granted = await requestSnapshotPermission()
-        setSnapshotsOn(granted)
-        if (!granted) setError('Permission denied. Snapshot search needs read access to capture page text.')
+        const status = await requestSnapshotPermission()
+        if (status === 'granted') {
+          setSnapshotsOn(true)
+        } else if (status === 'partial') {
+          // User granted one half (likely 'scripting') but denied the other (<all_urls>).
+          // Roll back to a clean state so we don't keep half-permissions live.
+          await removeSnapshotPermission()
+          setSnapshotsOn(false)
+          setError('Snapshot search needs BOTH the scripting permission AND read access to the pages you save. The partial grant was rolled back — try again and accept both.')
+        } else {
+          setSnapshotsOn(false)
+          setError('Permission denied. Snapshot search needs read access to capture page text.')
+        }
       }
     } finally {
       setBusy(false)
@@ -135,7 +145,7 @@ export function Settings({ license, onClose }: Props) {
                 {busy ? 'Activating…' : 'Activate'}
               </button>
               <p className="micro">
-                No license yet? <a href="https://tabpiles.app#pricing" target="_blank" rel="noreferrer">See Pro pricing</a>.
+                No license yet? <a href="https://tabpiles.pages.dev#pricing" target="_blank" rel="noreferrer">See Pro pricing</a>.
               </p>
             </>
           )}
@@ -143,12 +153,12 @@ export function Settings({ license, onClose }: Props) {
           {error && <p className="settings-error">{error}</p>}
         </section>
 
-        {isPro(license) && (
-          <section className="settings-section">
-            <h3>Snapshot search</h3>
-            <p className="micro">
-              Capture a plain-text snapshot of each page when you save a pile, so you can Cmd+K search across the actual content of pages — not just their titles. Requires read access to the pages you save.
-            </p>
+        <section className="settings-section">
+          <h3>Snapshot search {!isPro(license) && <span className="pro-tag">Pro</span>}</h3>
+          <p className="micro">
+            Capture a plain-text snapshot of each page when you save a pile, so you can Cmd+K search across the actual content of pages — not just their titles. Requires read access to the pages you save.
+          </p>
+          {isPro(license) ? (
             <button
               type="button"
               className={snapshotsOn ? 'settings-danger' : 'settings-primary'}
@@ -158,15 +168,25 @@ export function Settings({ license, onClose }: Props) {
             >
               {busy ? 'Working…' : snapshotsOn ? 'Disable snapshot capture' : 'Enable snapshot capture'}
             </button>
-          </section>
-        )}
+          ) : (
+            <a
+              className="settings-primary"
+              style={{ marginTop: 8, display: 'block', textAlign: 'center', textDecoration: 'none' }}
+              href="https://tabpiles.pages.dev#pricing"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Upgrade to enable
+            </a>
+          )}
+        </section>
 
         <section className="settings-section">
           <h3>About</h3>
           <p className="micro">
             Tab Piles v{chrome.runtime.getManifest().version}
             <br />
-            Issues, ideas, or feature requests: <a href="mailto:support@tabpiles.app">support@tabpiles.app</a>
+            Issues, ideas, or feature requests: <a href="mailto:tabpiles.support@gmail.com">tabpiles.support@gmail.com</a>
           </p>
         </section>
       </div>

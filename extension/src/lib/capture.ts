@@ -1,5 +1,5 @@
 import { db } from '../db/db'
-import { isPro } from './tierGate'
+import { getEffectiveCap, isPro } from './tierGate'
 import { validateLicense } from '../license/validate'
 import { captureSnapshot, hasSnapshotPermission } from './snapshots'
 
@@ -21,8 +21,12 @@ export async function saveCurrentWindowAsPile(name?: string): Promise<CaptureRes
   const tabs = await chrome.tabs.query({ windowId })
   const now = Date.now()
 
+  // License lookup happens once here — used by both the cap-bypass check
+  // (Pro skips the 10-pile cap) and the snapshot-capture decision below.
+  const license = await validateLicense().catch(() => null)
+  const cap = getEffectiveCap(license)
   const activeCount = await db.piles.where('archivedAt').equals(0).count()
-  const capExceeded = activeCount >= 10
+  const capExceeded = cap !== null && activeCount >= cap
 
   const pileName = name?.trim() || defaultPileName(tabs.length, now)
 
@@ -42,10 +46,13 @@ export async function saveCurrentWindowAsPile(name?: string): Promise<CaptureRes
 
   // Snapshot capture is best-effort. If the user is Pro AND has granted the
   // optional snapshot permission, fan out captureSnapshot per tab in parallel.
-  const license = await validateLicense().catch(() => null)
+  // allSettled (not Promise.all) so one tab's rejection doesn't blank the
+  // whole batch even though captureSnapshot already swallows errors.
   const wantsSnapshots = license && isPro(license) && (await hasSnapshotPermission())
   const snapshots = wantsSnapshots
-    ? await Promise.all(capturableTabs.map((t) => captureSnapshot(t.id)))
+    ? (await Promise.allSettled(capturableTabs.map((t) => captureSnapshot(t.id)))).map((r) =>
+        r.status === 'fulfilled' ? r.value : undefined,
+      )
     : capturableTabs.map(() => undefined)
 
   const savedTabs = capturableTabs.map((t, i) => ({
