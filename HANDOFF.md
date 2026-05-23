@@ -10,14 +10,13 @@ state: green
 
 ## Next action
 
-All in-extension feature work for v1 (free) and v1-Pro is complete and committed. Remaining work is **deploy + distribution**, gated on user-supplied accounts:
+**Follow `LAUNCH.md` end-to-end.** Single canonical checklist from "today" to first paying user. Steps reference the per-repo HANDOFFs for substep detail. Day 0 is ~3 hours of hands-on work; then ~5-7 days waiting on CWS review.
 
-1. **Chrome Web Store dev account** ($5 one-time). Then: zip `extension/dist/`, paste copy from `listing/copy.md`, paste justifications from `listing/permissions.md`, upload the 5 screenshots from `listing/screenshots/`. Submit. 5-7 day review SLA.
-2. **Cloudflare account** + custom domain. Connect `Projects/tab-piles-landing/` to CF Pages (output dir `src/`, no build command). Connect `Projects/tab-piles-worker/` via `wrangler deploy`. Create the D1 database first: `cd Projects/tab-piles-worker && npx wrangler d1 create tab-piles` and paste the returned database_id into `wrangler.toml`.
-3. **Lemon Squeezy account** with three products (monthly $5, yearly $40, lifetime $79). Set `activation_limit: 5` on each. Paste variant IDs into `Projects/tab-piles-worker/wrangler.toml` and Lemon Squeezy checkout URLs into `Projects/tab-piles-landing/src/main.js`. `npx wrangler secret put LS_API_KEY` and paste the LS API key.
-4. **Set `WORKER_URL`** in `extension/src/license/validate.ts` to the deployed worker URL, then rebuild + re-submit the extension (or save it for the v0.0.2 update).
-
-Each of these has its own per-repo HANDOFF.md with detailed steps. See `Projects/tab-piles-landing/HANDOFF.md` and `Projects/tab-piles-worker/HANDOFF.md`.
+All in-extension code is feature-complete, smoked, and tested. ~1000 lines of Pro code now have:
+- A critic-audit pass with 7 blockers + 10 nits triaged (blockers fixed, pile-id collision deferred to v0.0.2 + documented).
+- A Playwright MCP smoke pass confirming gear icon, Settings modal, Pro tier-pill flip, snapshot toggle, tab-note affordances, and palette upgrade nudge.
+- A vitest suite (21 tests across extension + worker): tierGate truth tables, validate cache/grace, worker variant→tier + cache TTL.
+- A `npm run zip` script that produces `dist.zip` (94 KB) ready for CWS upload.
 
 ## Recent context — 2026-05-23 Phase 2-5 shipped
 

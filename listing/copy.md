@@ -58,4 +58,4 @@ Productivity
 
 - **Single purpose:** A productivity tool for saving and restoring browser windows as named "piles" to manage browser-based context across research, writing, and project workflows.
 - **Support email:** *(user-supplied — add before submit)*
-- **Homepage URL:** *(user-supplied: tabpiles.app once landing is live)*
+- **Homepage URL:** `https://tabpiles.pages.dev` (free Cloudflare Pages subdomain — swap for a custom domain later if/when desired)
