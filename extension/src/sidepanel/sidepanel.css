@@ -36,6 +36,55 @@ body {
   gap: 10px;
 }
 
+.upgrade-nudge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, #f59e0b 25%, transparent);
+  font-size: 12px;
+}
+
+.upgrade-nudge a {
+  color: #c77a0a;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.upgrade-nudge a:hover {
+  text-decoration: underline;
+}
+
+.pro-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  background: #f59e0b;
+  color: #1f2933;
+  border-radius: 3px;
+  vertical-align: middle;
+  font-weight: 700;
+}
+
+.palette-upgrade {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #c77a0a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.palette-upgrade:hover {
+  text-decoration: underline;
+}
+
 .cap-meter {
   font-size: 12px;
   opacity: 0.7;

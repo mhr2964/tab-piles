@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, ACTIVE_PILE_CAP } from '../db/db'
+import { db } from '../db/db'
 import { PileList } from './PileList'
 import { PileDetail } from './PileDetail'
 import { CommandPalette } from './CommandPalette'
 import { Settings } from './Settings'
 import { useLicense } from '../license/useLicense'
 import { useSync } from '../sync/useSync'
+import { getEffectiveCap, isPro, UPGRADE_URL } from '../lib/tierGate'
 
 type View = 'active' | 'archived'
 
@@ -52,7 +53,9 @@ export function SidePanelApp() {
 
   const activeCount = activePiles?.length ?? 0
   const archivedCount = archivedPiles?.length ?? 0
-  const overCap = activeCount >= ACTIVE_PILE_CAP
+  const effectiveCap = getEffectiveCap(license)
+  const overCap = effectiveCap !== null && activeCount >= effectiveCap
+  const nearCap = effectiveCap !== null && activeCount >= effectiveCap - 1 && !isPro(license)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -71,7 +74,7 @@ export function SidePanelApp() {
         <h1>Tab Piles</h1>
         <div className="app-header-right">
           <div className="cap-meter" data-over={overCap}>
-            {activeCount} / {ACTIVE_PILE_CAP}
+            {effectiveCap === null ? `Active: ${activeCount}` : `${activeCount} / ${effectiveCap}`}
           </div>
           <button
             type="button"
@@ -84,6 +87,17 @@ export function SidePanelApp() {
           </button>
         </div>
       </header>
+
+      {nearCap && (
+        <div className="upgrade-nudge">
+          <span>
+            {overCap ? 'Past the 10-pile free cap.' : 'One slot left on the free cap.'}
+          </span>
+          <a href={UPGRADE_URL} target="_blank" rel="noreferrer">
+            Go Pro for unlimited →
+          </a>
+        </div>
+      )}
 
       <div className="view-toggle">
         <button
