@@ -1,0 +1,10 @@
+node_modules/
+extension/node_modules/
+extension/dist/
+.env
+.env.local
+.DS_Store
+
+# playwright MCP per-session artifacts
+.playwright-mcp/
+extension/.playwright-mcp/

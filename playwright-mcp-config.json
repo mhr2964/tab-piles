@@ -1,0 +1,13 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "userDataDir": "C:\\Users\\Owner\\Desktop\\AI\\.playwright\\tabpiles",
+    "launchOptions": {
+      "executablePath": "C:\\Users\\Owner\\AppData\\Local\\ms-playwright\\chromium-1224\\chrome-win64\\chrome.exe",
+      "args": [
+        "--load-extension=C:\\Users\\Owner\\Desktop\\AI\\Projects\\tab-piles\\extension\\dist",
+        "--disable-extensions-except=C:\\Users\\Owner\\Desktop\\AI\\Projects\\tab-piles\\extension\\dist"
+      ]
+    }
+  }
+}
