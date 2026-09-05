@@ -3,14 +3,22 @@
 Forward-looking handoff for the active work-stream on this project. **Overwrite** on each session that touches the work; do not append. History lives in git.
 
 ```yaml
-last-model: claude-opus-4-7
-last-session: 2026-05-23
-state: green
+last-model: claude-sonnet-5
+last-session: 2026-09-05
+state: yellow
 ```
 
-## Next action
+## Next action — user-block (Lemon Squeezy, then CWS)
 
-**Follow `LAUNCH.md` end-to-end.** Single canonical checklist from "today" to first paying user. Steps reference the per-repo HANDOFFs for substep detail. Day 0 is ~3 hours of hands-on work; then ~5-7 days waiting on CWS review.
+**Follow `LAUNCH.md` end-to-end.** Day 0 progress as of 2026-09-05:
+
+- ✅ Step 1 (landing live) — `https://tabpiles.pages.dev`
+- ✅ Step 3, minus LS wiring (worker deployed) — `https://tab-piles-worker.subtotal.workers.dev`, D1 created + migrated
+- ✅ Step 4, minus LS wiring (`WORKER_URL` set in extension; `dist.zip` built and ready)
+- ⏳ Step 2 (Lemon Squeezy) — **blocked on you.** Needs your own identity/payout info to sign up; nothing left for a model to drive until you do this. See `Projects/tab-piles-worker/HANDOFF.md` "Next action" for the exact fields to copy back.
+- ⏳ Step 5 (CWS submission) — **blocked on you.** $5 one-time dev-console fee needs your payment method. `dist.zip` is already built (`extension/dist.zip`, 94.9 KB) — nothing left to prep, just upload + paste listing copy from `listing/copy.md` and `listing/permissions.md` once you have the account.
+
+Once you hand back LS variant IDs + checkout URLs + API key, the remaining wiring (secret, redeploy worker, redeploy landing) is a single pass.
 
 All in-extension code is feature-complete, smoked, and tested. ~1000 lines of Pro code now have:
 - A critic-audit pass with 7 blockers + 10 nits triaged (blockers fixed, pile-id collision deferred to v0.0.2 + documented).
