@@ -4,7 +4,7 @@ import { STORAGE_LICENSE } from '../lib/storageKeys'
 // USER: set after worker deploy. Until then license activation will fail with
 // a network error and the extension stays on the free tier. That's the safe
 // default — no Pro features are gated yet anyway.
-export const WORKER_URL = 'https://tab-piles-worker.example.workers.dev'
+export const WORKER_URL = 'https://tab-piles-worker.subtotal.workers.dev'
 
 // Mount-side mirror of the worker's cache window. The worker is the source of
 // truth; this constant just tells `useLicense` when to bother re-asking the
