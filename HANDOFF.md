@@ -4,21 +4,23 @@ Forward-looking handoff for the active work-stream on this project. **Overwrite*
 
 ```yaml
 last-model: claude-sonnet-5
-last-session: 2026-09-05
+last-session: 2026-09-06
 state: yellow
 ```
 
-## Next action — user-block (Lemon Squeezy, then CWS)
+## Next action — user-block (take LS store live, then CWS)
 
-**Follow `LAUNCH.md` end-to-end.** Day 0 progress as of 2026-09-05:
+**Follow `LAUNCH.md` end-to-end.** Day 0 progress as of 2026-09-06:
 
 - ✅ Step 1 (landing live) — `https://tabpiles.pages.dev`
-- ✅ Step 3, minus LS wiring (worker deployed) — `https://tab-piles-worker.subtotal.workers.dev`, D1 created + migrated
-- ✅ Step 4, minus LS wiring (`WORKER_URL` set in extension; `dist.zip` built and ready)
-- ⏳ Step 2 (Lemon Squeezy) — **blocked on you.** Needs your own identity/payout info to sign up; nothing left for a model to drive until you do this. See `Projects/tab-piles-worker/HANDOFF.md` "Next action" for the exact fields to copy back.
+- ✅ Step 2 (Lemon Squeezy) — products created with license keys + 5-device cap, variant IDs + checkout URLs + API key all wired into worker + landing
+- ✅ Step 3 (worker deployed + LS-wired) — `https://tab-piles-worker.subtotal.workers.dev`; `npm run verify` confirms a real round-trip to the LS License API
+- ✅ Step 4 (placeholders wired) — `WORKER_URL` set in extension, `LS_OVERLAY_URLS` set in landing, `dist.zip` built and ready
+- ⏳ **New blocker found mid-Step-2:** the LS store is still in **test mode** (`test_mode: true` on all 3 variants) — real checkouts won't charge real money until you complete whatever store-verification step LS requires (check Store settings for payout/business info). See `Projects/tab-piles-worker/HANDOFF.md`.
+- ⏳ **Also confirm:** monthly/yearly variants have a 7-day free trial enabled by LS default — decide if that's intentional before launch.
 - ⏳ Step 5 (CWS submission) — **blocked on you.** $5 one-time dev-console fee needs your payment method. `dist.zip` is already built (`extension/dist.zip`, 94.9 KB) — nothing left to prep, just upload + paste listing copy from `listing/copy.md` and `listing/permissions.md` once you have the account.
 
-Once you hand back LS variant IDs + checkout URLs + API key, the remaining wiring (secret, redeploy worker, redeploy landing) is a single pass.
+**Trap for next session:** the Lemon Squeezy signup flow now presents a "Managed Payments" choice that can silently route you into Stripe's own separate "Stripe Managed Payments" product (Stripe acquired LS in 2024; both now coexist) instead of classic Lemon Squeezy. Our worker code targets classic LS's License API specifically — if a future product ever needs the same billing pattern, make sure signup lands on `app.lemonsqueezy.com`, not `dashboard.stripe.com`.
 
 All in-extension code is feature-complete, smoked, and tested. ~1000 lines of Pro code now have:
 - A critic-audit pass with 7 blockers + 10 nits triaged (blockers fixed, pile-id collision deferred to v0.0.2 + documented).
